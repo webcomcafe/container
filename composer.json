@@ -1,0 +1,13 @@
+{
+  "name": "webcomcafe/container",
+  "require": {
+    "php": ">=7.3|<8.0",
+    "psr/container": "1.0.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Webcomcafe\\Container\\": "src/",
+      "App\\": "app/"
+    }
+  }
+}
