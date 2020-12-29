@@ -135,6 +135,19 @@ abstract class Container implements ContainerInterface
     }
 
     /**
+     * @param string $key
+     * @param null $args
+     * @return mixed|object
+     * @throws ContainerException
+     * @throws NotFoundException
+     * @throws \ReflectionException
+     */
+    public function make(string $key, $args = null)
+    {
+        return $this->get($key, $args);
+    }
+
+    /**
      * Seta uma definição como permanente, fazendo com que seja sempre
      * retornada a mesma instância da classe definida
      *
