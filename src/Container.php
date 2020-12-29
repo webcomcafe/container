@@ -17,14 +17,14 @@ use Closure;
  * @package Webcomcafe\Container
  */
 
-class Container implements ContainerInterface
+abstract class Container implements ContainerInterface
 {
     /**
      * Lista de definições a serem resolvidas
      *
-     * @var array $definitions
+     * @var array $container
      */
-    private $definitions = [];
+    protected array $container = [];
 
     /**
      * Argumentos explicitamente definidos, para serem buscados quando
@@ -32,7 +32,7 @@ class Container implements ContainerInterface
      *
      * @var array $arguments
      */
-    private $arguments = [];
+    protected array $arguments = [];
 
     /**
      * Define uma resolução
@@ -42,7 +42,7 @@ class Container implements ContainerInterface
      */
     public function set(string $key, $callback)
     {
-        $this->definitions[$key] = $callback;
+        $this->container[$key] = $callback;
     }
 
     /**
@@ -65,7 +65,7 @@ class Container implements ContainerInterface
      */
     public function has($key)
     {
-        return isset($this->definitions[$key]);
+        return isset($this->container[$key]);
     }
 
     /**
@@ -82,7 +82,7 @@ class Container implements ContainerInterface
     {
         if( $this->has($key) )
         {
-            $service = $this->definitions[$key];
+            $service = $this->container[$key];
             return is_object($service) ? $service($this) : $this->get($service);
         }
 
@@ -141,7 +141,7 @@ class Container implements ContainerInterface
      */
     public function sgt(string $key, $resolver)
     {
-        $this->definitions[$key] = function() use ($resolver) {
+        $this->container[$key] = function() use ($resolver) {
             static $instance;
 
             if( null === $instance )
@@ -158,7 +158,7 @@ class Container implements ContainerInterface
      * @param string $name
      * @return mixed
      */
-    private function getExplicitArg(string $key, string $name)
+    protected function getExplicitArg(string $key, string $name)
     {
         $args = $this->arguments[$key] ?? [];
         if( array_key_exists($name, $args) ) {
