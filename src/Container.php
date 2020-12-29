@@ -40,7 +40,7 @@ abstract class Container implements ContainerInterface
      * @param string $key
      * @param Closure|string $resolver
      */
-    public function set(string $key, $resolver)
+    public function bind(string $key, $resolver)
     {
         $this->container[$key] = $resolver;
     }
@@ -143,7 +143,7 @@ abstract class Container implements ContainerInterface
      * @param string $key
      * @param $resolver
      */
-    public function sgt(string $key, $resolver)
+    public function singleton(string $key, $resolver)
     {
         $this->container[$key] = function() use ($resolver) {
             static $instance;
