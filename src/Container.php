@@ -38,11 +38,11 @@ abstract class Container implements ContainerInterface
      * Define uma resolução
      *
      * @param string $key
-     * @param Closure|string $callback
+     * @param Closure|string $resolver
      */
-    public function set(string $key, $callback)
+    public function set(string $key, $resolver)
     {
-        $this->container[$key] = $callback;
+        $this->container[$key] = $resolver;
     }
 
     /**
@@ -73,13 +73,17 @@ abstract class Container implements ContainerInterface
      * resolvendo todas as suas dependencias
      *
      * @param string $key
+     * @param array|Closure $args
      * @return mixed|object
      * @throws ContainerException
      * @throws NotFoundException
      * @throws \ReflectionException
      */
-    public function get($key)
+    public function get($key, $args = null)
     {
+        if( is_array($args) )
+            $this->arg($key, $args);
+
         if( $this->has($key) )
         {
             $service = $this->container[$key];
