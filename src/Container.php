@@ -7,7 +7,7 @@ use ReflectionParameter;
 use ReflectionException;
 use Closure;
 use ReflectionFunction;
-use Webcomcafe\Container\Exceptions\NotFoundException;
+use Webcomcafe\Service\Exceptions\NotFoundException;
 
 /**
  * Service Container para injeção de deped~encias
