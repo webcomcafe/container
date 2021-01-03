@@ -1,151 +1,119 @@
 <?php
 
-namespace Webcomcafe\Container;
+namespace Webcomcafe\Service;
 
 use Psr\Container\ContainerInterface;
-use ReflectionClass;
-use Webcomcafe\Container\Exceptions\ContainerException;
-use Webcomcafe\Container\Exceptions\NotFoundException;
+use ReflectionParameter;
+use ReflectionException;
 use Closure;
+use ReflectionFunction;
+use Webcomcafe\Container\Exceptions\NotFoundException;
 
 /**
- * Service Container para resoluão automática de depdências
+ * Service Container para injeção de deped~encias
  *
- * Class Container
- *
- * @author Airton Lopes
- * @package Webcomcafe\Container
+ * @author Airton Lopes <airtonlopes_@hotmail.com>
+ * @package Webcomcafe\Service
  */
 
 abstract class Container implements ContainerInterface
 {
     /**
-     * Lista de definições a serem resolvidas
+     * Coleção de serviços resolvidos
      *
      * @var array $container
      */
     protected array $container = [];
 
+
     /**
-     * Argumentos explicitamente definidos, para serem buscados quando
-     * suas respectivas depedências forem resolvidas
+     * Argumentos previamente definidos para uso no
+     * instance em que um serviço for solicitado.
      *
      * @var array $arguments
      */
-    protected array $arguments = [];
+    private array $arguments = [];
+
 
     /**
-     * Define uma resolução
+     * Define um serviço a ser resolvido
      *
-     * @param string $key
-     * @param Closure|string $resolver
+     * @param string $id
+     * @param $resolve
+     * @throws ReflectionException
      */
-    public function bind(string $key, $resolver)
+    public function bind(string $id, $resolve) : void
     {
-        $this->container[$key] = $resolver;
+        $this->set($id, $resolve);
     }
 
-    /**
-     * Define argumentos de uma determinada classe,
-     * geralmente valores primitivos presentes no construtor
-     *
-     * @param string $key
-     * @param array $args
-     */
-    public function arg(string $key, array $args)
-    {
-        $this->arguments[$key] = $args;
-    }
 
     /**
-     * Verifica se uma definição foi setada
+     * Define argumentos para métodos de classes
      *
-     * @param string $key
-     * @return bool
+     * @param string $id
+     * @param array $arguments
      */
-    public function has($key)
+    public function args(string $id, array $arguments) : void
     {
-        return isset($this->container[$key]);
-    }
-
-    /**
-     * Recupera um objeto de uma determinada classe,
-     * resolvendo todas as suas dependencias
-     *
-     * @param string $key
-     * @param array|Closure $args
-     * @return mixed|object
-     * @throws ContainerException
-     * @throws NotFoundException
-     * @throws \ReflectionException
-     */
-    public function get($key, $args = null)
-    {
-        if( is_array($args) )
-            $this->arg($key, $args);
-
-        if( $this->has($key) )
-        {
-            $service = $this->container[$key];
-            return is_object($service) ? $service($this) : $this->get($service);
+        foreach ($arguments as $method => $args) {
+            $current = $this->arguments[$id][$method] ?? [];
+            $this->arguments[$id][$method] = array_merge($current, $args);
         }
-
-        $reflection = new ReflectionClass($key);
-        $constructor = $reflection->getConstructor();
-
-        if( null === $constructor )
-            return new $key();
-
-        /**
-         * Resolve as depdências de cada parâmetro do construtor
-         *
-         * @param \ReflectionParameter $parameter
-         * @return mixed|object
-         */
-        $resolveParameters = function(\ReflectionParameter $parameter) use ($key)
-        {
-            $name  = $parameter->getName();
-            $class = ($c=$parameter->getClass()) ? $c->getName() : null;
-            $value = null;
-
-            if( $parameter->isDefaultValueAvailable() ) {
-                $value = $parameter->getDefaultValue();
-            }
-
-            if( $explicitValue = $this->getExplicitArg($key, $name)) {
-                $value = $explicitValue;
-            }
-
-            if( $class ) {
-                if( !class_exists($class) )
-                    throw new NotFoundException();
-
-                $value = $this->get($class);
-            }
-
-            if( null === $value )
-                throw new ContainerException('Argument "' . $name . '" no provided to "' .$key. '" instance');
-
-            return $value;
-        };
-
-        $args = array_map($resolveParameters, $constructor->getParameters());
-
-        return $reflection->newInstanceArgs($args);
     }
+
 
     /**
-     * @param string $key
-     * @param null $args
+     * Constróe um serviço e o retorna com suas dependecias resolvidas
+     *
+     * @param string $id
      * @return mixed|object
-     * @throws ContainerException
      * @throws NotFoundException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
-    public function make(string $key, $args = null)
+    public function get($id)
     {
-        return $this->get($key, $args);
+        if( $this->has($id) )
+            return $this->container[$id]($this);
+
+        $ref = $this->reflection($id);
+        $constructor = $ref->getConstructor();
+
+        if( null == $constructor)
+            return new $id();
+
+        $arguments = $this->getArgs($id, '__construct');
+        $resolvedArgs = $this->resolveArguments($constructor->getParameters(), $arguments);
+
+        return $ref->newInstanceArgs($resolvedArgs);
     }
+
+
+    /**
+     * Constrói um serviço, mantém sua instância pronta, e retornando-a
+     *
+     * @param string $id
+     * @param Closure|null $callable
+     * @return object
+     * @throws ReflectionException
+     */
+    public function make(string $id, $callable = null) : object
+    {
+        return $this->container[$id] = $callable ? $callable($this) : $this->get($id);
+    }
+
+
+    /**
+     * Define uma instância a ser recuperada
+     *
+     * @param string $id
+     * @param $resolve
+     */
+    private function set(string $id, $resolve) : void
+    {
+        $this->container[$id] = $this->makeClosure($resolve);
+    }
+
 
     /**
      * Seta uma definição como permanente, fazendo com que seja sempre
@@ -153,33 +121,143 @@ abstract class Container implements ContainerInterface
      *
      * @example Singleton
      *
-     * @param string $key
+     * @param string $id
      * @param $resolver
      */
-    public function singleton(string $key, $resolver)
+    public function singleton(string $id, $resolver)
     {
-        $this->container[$key] = function() use ($resolver) {
+        $service = $this->makeClosure($resolver);
+
+        $this->container[$id] = function() use ($service) {
             static $instance;
 
             if( null === $instance )
-                $instance = $resolver($this);
+                $instance = $service($this);
 
             return $instance;
         };
     }
 
+
     /**
-     * Recupera um argumento explicitamente definido para uma classe
+     * Garante uma definição de closure
      *
-     * @param string $key
-     * @param string $name
-     * @return mixed
+     * @param $resolve
+     * @return Closure
      */
-    protected function getExplicitArg(string $key, string $name)
+    private function makeClosure($resolve) : Closure
     {
-        $args = $this->arguments[$key] ?? [];
-        if( array_key_exists($name, $args) ) {
-            return $args[$name];
+        return ($resolve instanceof Closure) ? $resolve : fn($c) => $c->get($resolve);
+    }
+
+
+    /**
+     * Retorna argumentos de um método de uma determinada classe
+     *
+     * @param string $id
+     * @param string $method
+     * @return array|mixed
+     */
+    private function getArgs(string $id, string $method) : array
+    {
+        return $this->arguments[$id][$method] ?? [];
+    }
+
+
+    /**
+     * Executa uma closure ou um método de um objeto, resolvendo as depedências
+     * de seus parâmetros
+     *
+     * @param $callable
+     * @param array $arguments
+     * @return mixed
+     * @throws NotFoundException
+     * @throws ReflectionException
+     */
+    public function call($callable, array $arguments = [])
+    {
+        $class = $this->reflection(is_array($callable) ? $callable[0] : $callable);
+
+        if( $class instanceof ReflectionFunction )
+        {
+            $resolvedArgs = $this->resolveArguments (
+                $class->getParameters(),
+                $arguments
+            );
+
+            return $callable(...$resolvedArgs);
         }
+
+        [$id, $method] = $callable;
+        $arguments = $arguments ? $arguments : $this->arguments[$id][$method] ?? [];
+
+        $resolvedArgs = $this->resolveArguments (
+            $class->getMethod($method)->getParameters(),
+            $arguments
+        );
+
+        $instance = $this->get($id);
+        return $instance->$method(...$resolvedArgs);
+    }
+
+
+    /**
+     * Verifica se um id foi definido
+     *
+     * @param $id
+     * @return bool
+     */
+    public function has($id) : bool
+    {
+        return isset($this->container[$id]);
+    }
+
+
+    /**
+     * Resolve dependências de argumentos
+     *
+     * @param ReflectionParameter[] $parameters
+     * @param array $defaults
+     * @return array
+     * @throws NotFoundException
+     * @throws ReflectionException
+     */
+    private function resolveArguments(array $parameters, array $defaults = []) : array
+    {
+        $callable = function(ReflectionParameter $parameter) use (&$defaults) {
+            $name  = $parameter->getName();
+            $class = ($c=$parameter->getClass()) ? $c->getName() : null;
+
+            if( null == $class )
+            {
+                if( $value = array_shift($defaults) )
+                    return $value;
+
+                if( $parameter->isDefaultValueAvailable() )
+                    return $parameter->getDefaultValue();
+
+                throw new NotFoundException('Parameter {'.$name.'} not found');
+            }
+
+            return $this->get($class);
+        };
+
+        return array_map($callable, $parameters);
+    }
+
+
+    /**
+     * Instancia uma reflection de classe ou closure e retorna
+     *
+     * @param $objectOrdClass
+     * @return \ReflectionClass|\ReflectionFunction
+     * @throws \ReflectionException
+     */
+    private function reflection($objectOrdClass)
+    {
+        if( $objectOrdClass instanceof \Closure) {
+            return new ReflectionFunction($objectOrdClass);
+        }
+        return new \ReflectionClass($objectOrdClass);
     }
 }

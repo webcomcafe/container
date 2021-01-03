@@ -1,4 +1,5 @@
 vendor/
 app/
+service/
 .idea
 index.php

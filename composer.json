@@ -6,8 +6,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Webcomcafe\\Container\\": "src/",
-      "App\\": "app/"
+      "Webcomcafe\\Service\\": "src/"
     }
   }
 }
