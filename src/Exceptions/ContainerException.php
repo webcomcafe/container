@@ -1,6 +1,6 @@
 <?php
 
-namespace Webcomcafe\Container\Exceptions;
+namespace Webcomcafe\Service\Exceptions;
 
 use Psr\Container\ContainerExceptionInterface;
 

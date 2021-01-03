@@ -1,6 +1,6 @@
 <?php
 
-namespace Webcomcafe\Container\Exceptions;
+namespace Webcomcafe\Service\Exceptions;
 
 class NotFoundException extends ContainerException
 {
