@@ -196,7 +196,7 @@ abstract class Container implements ContainerInterface
             $arguments
         );
 
-        $instance = $this->get($id);
+        $instance = is_object($id) ? $id : $this->get($id);
         return $instance->$method(...$resolvedArgs);
     }
 
@@ -224,14 +224,16 @@ abstract class Container implements ContainerInterface
      */
     private function resolveArguments(array $parameters, array $defaults = []) : array
     {
-        $callable = function(ReflectionParameter $parameter) use (&$defaults) {
+        $callable = function(ReflectionParameter $parameter) use (&$defaults, &$count) {
             $name  = $parameter->getName();
             $class = ($c=$parameter->getClass()) ? $c->getName() : null;
+            $order = $parameter->getPosition() - $count;
 
             if( null == $class )
             {
-                if( $value = array_shift($defaults) )
+                if( $value = $this->array_shift($defaults, $order)) {
                     return $value;
+                }
 
                 if( $parameter->isDefaultValueAvailable() )
                     return $parameter->getDefaultValue();
@@ -239,10 +241,42 @@ abstract class Container implements ContainerInterface
                 throw new NotFoundException('Parameter {'.$name.'} not found');
             }
 
+            //
+            // Seu uma classe for requisitada e se $defaults contiver
+            // um objeto pronto na posição atual de $order, então este objeto é retornado.
+            // isso faz com que o nosso container obrigue o método de destino receber exatamente
+            // o tipo do objeto atual que está sendo retornado.
+            //
+            // Caso o valor da posição atual $order em $defaults não seja um objeto,
+            // então esse valor será ignorado, e uma instancia de $class será retornada
+            //
+            if( isset( $defaults[$order] ) && is_object($defaults[$order])) {
+                return $defaults[$order];
+            }
+
+            $count++;
             return $this->get($class);
         };
 
+        $count = 0;
         return array_map($callable, $parameters);
+    }
+
+    /**
+     * array_shift sem reordenar as chaves
+     *
+     * @param array $data
+     * @param int $index
+     * @return mixed
+     */
+    private function array_shift(array &$data, int $index)
+    {
+        if( isset($data[$index]) )
+        {
+            $value = $data[$index];
+            unset($data[$index]);
+            return $value;
+        }
     }
 
 
